@@ -1,3 +1,14 @@
+from langchain.chat_models import init_chat_model
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import START, END, MessagesState, StateGraph
+from typing import Sequence
+from langchain_core.messages import BaseMessage, SystemMessage, trim_messages, AIMessage, HumanMessage
+from langchain_core.output_parsers import StrOutputParser
+from langgraph.graph.message import add_messages
+from typing_extensions import Annotated, TypedDict
+from langgraph.graph.state import CompiledStateGraph
+
 try: 
   from dotenv import load_dotenv
 
@@ -7,11 +18,7 @@ except ImportError:
   pass
 
 
-from langchain.chat_models import init_chat_model
-
 model = init_chat_model("gemini-2.5-flash", model_provider="google_genai")
-
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 prompt_template = ChatPromptTemplate.from_messages([
     (
@@ -20,16 +27,6 @@ prompt_template = ChatPromptTemplate.from_messages([
     ),
     MessagesPlaceholder(variable_name="messages"),
 ])
-
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import START, END, MessagesState, StateGraph
-
-from typing import Sequence
-
-from langchain_core.messages import BaseMessage, SystemMessage, trim_messages
-from langchain_core.output_parsers import StrOutputParser
-from langgraph.graph.message import add_messages
-from typing_extensions import Annotated, TypedDict
 
 trimmer = trim_messages(
     max_tokens=10000,
@@ -44,74 +41,81 @@ class State(TypedDict):
     messages : Annotated[Sequence[BaseMessage], add_messages]
     branch: bool
 
-workflow = StateGraph(state_schema=State)
+class Graph:
 
-def ask_user_to_branch(state: State):
-    if not state["messages"]:
-       return {"branch": False}
-    # This is a step that could be completely avoided by a button in the UI
-    query = input("Do you want to open a new branch? (y/n)").lower()
-    if query == "y":
-       return {"branch": True}
-    elif query == "n":
-       return {"branch": False}
-    else:
-       print("Invalid entry.. try again..")
-       result = ask_user_to_branch(state=state)
-       return result
-    
-def brancher(state: State):
-   if state["branch"] == True:
-      return "branch"
-   else:
-      return "no branch"
+   def ask_user_to_branch(self, state:State):
+         if not state["messages"]:
+            return {"branch": False}
+         # This is a step that could be completely avoided by a button in the UI
+         query = input("Do you want to open a new branch? (y/n)").lower()
+         if query == "y":
+            return {"branch": True}
+         elif query == "n":
+            return {"branch": False}
+         else:
+            print("Invalid entry.. try again..")
+            result = self.ask_user_to_branch(state=state)
+            return result
    
-def call_model(state: State):
-    trimmed_messages = trimmer.invoke(state["messages"])
-    chain = prompt_template | model | StrOutputParser()
-    chunks = []
-    for chunk in chain.stream({"messages": trimmed_messages, "language": "English"}):
-       chunks.append(chunk)
-       print(chunk, end="", flush=True)
-    print("\n\n")
-    response = ''.join(chunks)
-    return {"messages" : [AIMessage(content=response)]}
+   @staticmethod
+   def brancher(state:State):
+      if state["branch"] == True:
+         return "branch"
+      else:
+         return "no branch"
+   
+   @staticmethod
+   def call_model(state:State):
+      trimmed_messages = trimmer.invoke(state["messages"])
+      chain = prompt_template | model | StrOutputParser()
+      chunks = []
+      for chunk in chain.stream({"messages": trimmed_messages, "language": "English"}):
+         chunks.append(chunk)
+         print(chunk, end="", flush=True)
+      print("\n\n")
+      response = ''.join(chunks)
+      return {"messages" : [AIMessage(content=response)]}
 
-def branch_chat(state: State):
-   print("In branch chat.")
+   @staticmethod
+   def branch_chat(state:State):
+      print("In branch chat.")
 
-def query(state: State):
-   user_input = input("Ask away: ")
-   query = [HumanMessage(content=user_input)]
-   return {"messages" : query}
+   @staticmethod
+   def query(state:State):
+      user_input = input("Ask away: ")
+      query = [HumanMessage(content=user_input)]
+      return {"messages" : query}
 
+   def buildGraph(self):
+      workflow = StateGraph(state_schema=State)
+      workflow.add_node("ask_to_branch", self.ask_user_to_branch)
+      workflow.add_edge(START, "ask_to_branch")
+      workflow.add_node("model", self.call_model)
+      workflow.add_node("branch_chat", self.branch_chat)
+      workflow.add_node("query", self.query)
+      workflow.add_edge("query", "model")
+      workflow.add_edge("model", "ask_to_branch")
+      workflow.add_edge("branch_chat", END)
+      workflow.add_conditional_edges(
+         source="ask_to_branch",
+         path=self.brancher,
+         path_map={
+            "branch": "branch_chat",
+            "no branch": "query"
+         }
+      )
+      memory = MemorySaver()
+      app = workflow.compile(memory)
+      return app
 
-workflow.add_node("ask_to_branch", ask_user_to_branch)
-workflow.add_edge(START, "ask_to_branch")
-workflow.add_node("model", call_model)
-workflow.add_node("branch_chat", branch_chat)
-workflow.add_node("query", query)
-workflow.add_edge("query", "model")
-workflow.add_edge("model", "ask_to_branch")
-workflow.add_edge("branch_chat", END)
-workflow.add_conditional_edges(
-   source="ask_to_branch",
-   path=brancher,
-   path_map={
-      "branch": "branch_chat",
-      "no branch": "query"
-   }
-)
-
-
-memory = MemorySaver()
-app = workflow.compile(checkpointer=memory)
+app = Graph().buildGraph()
 
 config = {"configurable" : {"thread_id": "abc124"}}
 
 from langchain_core.messages import HumanMessage, AIMessage
 
 app.invoke({"messages": []}, config)
+
 '''
 from datetime import datetime, timezone
 from langgraph.checkpoint.base import Checkpoint, CheckpointMetadata
