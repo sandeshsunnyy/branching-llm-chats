@@ -7,7 +7,8 @@ from langchain_core.messages import BaseMessage, SystemMessage, trim_messages, A
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph.message import add_messages
 from typing_extensions import Annotated, TypedDict
-from langgraph.graph.state import CompiledStateGraph
+from datetime import datetime, timezone
+from langgraph.checkpoint.base import Checkpoint, CheckpointMetadata
 
 try: 
   from dotenv import load_dotenv
@@ -19,6 +20,7 @@ except ImportError:
 
 
 model = init_chat_model("gemini-2.5-flash", model_provider="google_genai")
+memory = MemorySaver()
 
 prompt_template = ChatPromptTemplate.from_messages([
     (
@@ -40,6 +42,9 @@ trimmer = trim_messages(
 class State(TypedDict):
     messages : Annotated[Sequence[BaseMessage], add_messages]
     branch: bool
+    current_config: dict
+    parent: list
+    children: list
 
 class Graph:
 
@@ -76,9 +81,43 @@ class Graph:
       response = ''.join(chunks)
       return {"messages" : [AIMessage(content=response)]}
 
-   @staticmethod
-   def branch_chat(state:State):
-      print("In branch chat.")
+
+   def branch_chat(self, state:State):
+      memory_state = memory.get(config=config)
+
+      channel_value = memory_state["channel_values"]
+      current_ts = datetime.now(timezone.utc).isoformat()
+
+      config_new_branch = {"configurable": {"thread_id": "abc125", "checkpoint_ns": "branch1"}}
+
+      checkpoint = Checkpoint(
+         v=1,
+         id=current_ts,
+         ts=current_ts,
+         channel_values=channel_value,
+         channel_versions={"messages":current_ts},
+         versions_seen={"messages":current_ts}
+      )
+
+      metadata = CheckpointMetadata(
+         source='input',
+         step=0,
+         parents={},
+      )
+
+      new_versions = {"messages":current_ts}
+      memory.put(config=config_new_branch, checkpoint=checkpoint, metadata=metadata, new_versions=new_versions)
+
+      memory_state_new_branch = memory.get(config=config_new_branch)
+      new_branch_memory = memory_state_new_branch["channel_values"]["messages"]
+
+      length_of_current_context = len(new_branch_memory)
+
+      new_app = self.buildGraph()
+      new_app.invoke({"messages": new_branch_memory, "current_config":config_new_branch})
+      #it should return a summary of whatever the messages where typed. Here whatever was added after the current point must be summerized and sent-back.
+      #Give the length of current context as context and the rest for summarization.
+
 
    @staticmethod
    def query(state:State):
@@ -104,7 +143,6 @@ class Graph:
             "no branch": "query"
          }
       )
-      memory = MemorySaver()
       app = workflow.compile(memory)
       return app
 
@@ -114,40 +152,22 @@ config = {"configurable" : {"thread_id": "abc124"}}
 
 from langchain_core.messages import HumanMessage, AIMessage
 
-app.invoke({"messages": []}, config)
+app.invoke({"messages": [], "current_config": config}, config)
 
-'''
-from datetime import datetime, timezone
-from langgraph.checkpoint.base import Checkpoint, CheckpointMetadata
 
+config_new_branch = {"configurable": {"thread_id": "abc125", "checkpoint_ns": "branch1"}}
 
 memory_state = memory.get(config=config)
+new_memory_state = memory.get(config=config_new_branch)
 
-channel_value = memory_state["channel_values"] # This contains the list of messages in dict format
-current_ts = datetime.now(timezone.utc).isoformat()
+old_messages = memory_state["channel_values"]["messages"]
+new_messages = new_memory_state["channel_values"]["messages"]
 
-config_new_branch = {"configurable": {"thread_id": "abc124", "checkpoint_ns": "branch1"}}
-
-checkpoint = Checkpoint(
-    v=1,
-    id=current_ts,
-    ts=current_ts,
-    channel_values=channel_value,
-    channel_versions={"messages":current_ts},
-    versions_seen={"messages":current_ts}
-)
-
-metadata = CheckpointMetadata(
-    source='input',
-    step=0,
-    parents={},
-)
-
-new_versions = {"messages":current_ts}
-memory.put(config=config_new_branch, checkpoint=checkpoint, metadata=metadata, new_versions=new_versions)
-
-memory_state_new_branch = memory.get(config=config_new_branch)
-new_branch_memory = memory_state_new_branch["channel_values"]["messages"]
-
-
-memory_state = memory.get(config=config)'''
+print("Old Messages")
+print("-"*20)
+print(old_messages)
+print("\n")
+print("New Messages")
+print("-"*20)
+print(new_messages)
+print("\n")
