@@ -115,11 +115,13 @@ class Graph:
       length_of_current_context = len(new_branch_memory)
 
       new_app = BranchGraph().buildGraph()
-      new_app.invoke({"messages": new_branch_memory, "current_config":config_new_branch}, config=config_new_branch)
+      branch_state = new_app.invoke({"messages": new_branch_memory, "current_config":config_new_branch}, config=config_new_branch)
       #it should return a summary of whatever the messages where typed. Here whatever was added after the current point must be summerized and sent-back.
       #Give the length of current context as context and the rest for summarization.
 
-      return {"messages": state["messages"][length_of_current_context:]} # this is for testing, will find out what to do here later.
+      print(branch_state)
+
+      return {"messages": branch_state["messages"][length_of_current_context:]} # this is for testing, will find out what to do here later.
 
    @staticmethod
    def query(state:State):
