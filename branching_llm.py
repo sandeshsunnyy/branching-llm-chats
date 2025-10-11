@@ -42,6 +42,7 @@ trimmer = trim_messages(
 class State(TypedDict):
     messages : Annotated[Sequence[BaseMessage], add_messages]
     branch: bool
+    stop_chat: bool
     current_config: dict
     parent: list
     children: list
@@ -113,8 +114,8 @@ class Graph:
 
       length_of_current_context = len(new_branch_memory)
 
-      new_app = self.buildGraph()
-      new_app.invoke({"messages": new_branch_memory, "current_config":config_new_branch})
+      new_app = BranchGraph().buildGraph()
+      new_app.invoke({"messages": new_branch_memory, "current_config":config_new_branch}, config=config_new_branch)
       #it should return a summary of whatever the messages where typed. Here whatever was added after the current point must be summerized and sent-back.
       #Give the length of current context as context and the rest for summarization.
 
@@ -125,6 +126,24 @@ class Graph:
       query = [HumanMessage(content=user_input)]
       return {"messages" : query}
 
+   def stop(self, state: State):
+      decision = input("Do you want to end the conversation? (y/n): ").strip().lower()
+      if decision == 'y':
+         return {"stop_chat": True }
+      elif decision == 'n':
+         return {"stop_chat": False}
+      else:
+         print("Invalid entry!")
+         decision = self.stop(state)
+         return decision
+
+   @staticmethod
+   def should_stop(state:State):
+      if state["stop_chat"]:
+         return "stop"
+      else:
+         return "continue"
+
    def buildGraph(self):
       workflow = StateGraph(state_schema=State)
       workflow.add_node("ask_to_branch", self.ask_user_to_branch)
@@ -133,14 +152,66 @@ class Graph:
       workflow.add_node("branch_chat", self.branch_chat)
       workflow.add_node("query", self.query)
       workflow.add_edge("query", "model")
-      workflow.add_edge("model", "ask_to_branch")
-      workflow.add_edge("branch_chat", END)
+      workflow.add_node("stop", self.stop)
+      workflow.add_edge("model", "stop")
+      workflow.add_edge("branch_chat", "stop")
       workflow.add_conditional_edges(
          source="ask_to_branch",
          path=self.brancher,
          path_map={
             "branch": "branch_chat",
             "no branch": "query"
+         }
+      )
+      workflow.add_conditional_edges(
+         source="stop",
+         path=self.should_stop,
+         path_map={
+            "stop": END,
+            "continue": "ask_to_branch"
+         }
+      )
+      app = workflow.compile(memory)
+      return app
+
+class BranchGraph(Graph):
+
+   def stop(self, state):
+      decision = input("Do you want to return to main branch? (y/n): ").strip().lower()
+      if decision == 'y':
+         return {"stop_chat": True }
+      elif decision == 'n':
+         return {"stop_chat": False}
+      else:
+         print("Invalid entry!")
+         decision = self.stop(state)
+         return decision
+      
+   def buildGraph(self):
+      workflow = StateGraph(state_schema=State)
+      workflow.add_node("ask_to_branch", self.ask_user_to_branch)
+      workflow.add_edge(START, "ask_to_branch")
+      workflow.add_node("model", self.call_model)
+      workflow.add_node("branch_chat", self.branch_chat)
+      workflow.add_node("query", self.query)
+      workflow.add_edge("query", "model")
+      workflow.add_node("stop", self.stop)
+      workflow.add_edge("model", "stop")
+      workflow.add_edge("branch_chat", "stop")
+      workflow.add_conditional_edges(
+         source="ask_to_branch",
+         path=self.brancher,
+         path_map={
+            "branch": "branch_chat",
+            "no branch": "query"
+         }
+      )
+      workflow.add_conditional_edges(
+         source="stop",
+         path=self.should_stop,
+         path_map={
+            "stop": END,
+            "continue": "ask_to_branch"
          }
       )
       app = workflow.compile(memory)
