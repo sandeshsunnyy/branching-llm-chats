@@ -118,7 +118,8 @@ class Graph:
       new_app.invoke({"messages": new_branch_memory, "current_config":config_new_branch}, config=config_new_branch)
       #it should return a summary of whatever the messages where typed. Here whatever was added after the current point must be summerized and sent-back.
       #Give the length of current context as context and the rest for summarization.
-      return {"messages": state["messages"][length_of_current_context:]}
+
+      return {"messages": state["messages"][length_of_current_context:]} # this is for testing, will find out what to do here later.
 
    @staticmethod
    def query(state:State):
@@ -223,7 +224,7 @@ config = {"configurable" : {"thread_id": "abc124"}}
 
 from langchain_core.messages import HumanMessage, AIMessage
 
-app.invoke({"messages": [], "current_config": config}, config)
+app.invoke({"messages": [], "current_config": config}, config=config)
 
 
 config_new_branch = {"configurable": {"thread_id": "abc125", "checkpoint_ns": "branch1"}}
