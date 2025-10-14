@@ -47,6 +47,28 @@ class State(TypedDict):
     parent: list
     children: list
 
+def putMemory(config: dict, channel_values: dict, memory: MemorySaver) -> None:
+   channel_value = channel_values
+   current_ts = datetime.now(timezone.utc).isoformat()
+
+   checkpoint = Checkpoint(
+      v=1,
+      id=current_ts,
+      ts=current_ts,
+      channel_values=channel_value,
+      channel_versions={"messages":current_ts},
+      versions_seen={"messages":current_ts}
+   )
+
+   metadata = CheckpointMetadata(
+      source='input',
+      step=0,
+      parents={},
+   )
+
+   new_versions = {"messages":current_ts}
+   memory.put(config=config, checkpoint=checkpoint, metadata=metadata, new_versions=new_versions)
+
 class Graph:
 
    def ask_user_to_branch(self, state:State):
@@ -93,29 +115,8 @@ class Graph:
       branch_state = new_app.invoke({"messages": state["messages"], "current_config":config_new_branch}, config=config_new_branch)
       #it should return a summary of whatever the messages where typed. Here whatever was added after the current point must be summerized and sent-back.
       #Give the length of current context as context and the rest for summarization.
-
-      channel_value = branch_state
-      print(channel_value)
-      current_ts = datetime.now(timezone.utc).isoformat()
-
-      checkpoint = Checkpoint(
-         v=1,
-         id=current_ts,
-         ts=current_ts,
-         channel_values=channel_value,
-         channel_versions={"messages":current_ts},
-         versions_seen={"messages":current_ts}
-      )
-
-      metadata = CheckpointMetadata(
-         source='input',
-         step=0,
-         parents={},
-      )
-
-      new_versions = {"messages":current_ts}
-      memory.put(config=config_new_branch, checkpoint=checkpoint, metadata=metadata, new_versions=new_versions)
-
+      putMemory(config=config_new_branch, channel_values=branch_state, memory=memory)
+      
       return {"messages": branch_state["messages"][length_of_current_context:]} # this is for testing, will find out what to do here later.
 
    @staticmethod
