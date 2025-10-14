@@ -84,12 +84,19 @@ class Graph:
 
 
    def branch_chat(self, state:State):
-      memory_state = memory.get(config=config)
 
-      channel_value = memory_state["channel_values"]
-      current_ts = datetime.now(timezone.utc).isoformat()
+      length_of_current_context = len(state["messages"])
 
       config_new_branch = {"configurable": {"thread_id": "abc125", "checkpoint_ns": "branch1"}}
+
+      new_app = BranchGraph().buildGraph()
+      branch_state = new_app.invoke({"messages": state["messages"], "current_config":config_new_branch}, config=config_new_branch)
+      #it should return a summary of whatever the messages where typed. Here whatever was added after the current point must be summerized and sent-back.
+      #Give the length of current context as context and the rest for summarization.
+
+      channel_value = branch_state
+      print(channel_value)
+      current_ts = datetime.now(timezone.utc).isoformat()
 
       checkpoint = Checkpoint(
          v=1,
@@ -108,18 +115,6 @@ class Graph:
 
       new_versions = {"messages":current_ts}
       memory.put(config=config_new_branch, checkpoint=checkpoint, metadata=metadata, new_versions=new_versions)
-
-      memory_state_new_branch = memory.get(config=config_new_branch)
-      new_branch_memory = memory_state_new_branch["channel_values"]["messages"]
-
-      length_of_current_context = len(new_branch_memory)
-
-      new_app = BranchGraph().buildGraph()
-      branch_state = new_app.invoke({"messages": new_branch_memory, "current_config":config_new_branch}, config=config_new_branch)
-      #it should return a summary of whatever the messages where typed. Here whatever was added after the current point must be summerized and sent-back.
-      #Give the length of current context as context and the rest for summarization.
-
-      print(branch_state)
 
       return {"messages": branch_state["messages"][length_of_current_context:]} # this is for testing, will find out what to do here later.
 
