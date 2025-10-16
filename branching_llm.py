@@ -9,6 +9,7 @@ from langgraph.graph.message import add_messages
 from typing_extensions import Annotated, TypedDict
 from datetime import datetime, timezone
 from langgraph.checkpoint.base import Checkpoint, CheckpointMetadata
+import langchain
 
 try: 
   from dotenv import load_dotenv
@@ -30,6 +31,37 @@ prompt_template = ChatPromptTemplate.from_messages([
     MessagesPlaceholder(variable_name="messages"),
 ])
 
+summarizer_prompt_template = ChatPromptTemplate.from_messages([
+   (
+      "system",
+      """
+         Persona:
+         You are a summarizer. Your job is to summarize the messages given to you. A context will also be given so that you understand the whole picture. So summarize the text given under 'Messages to summarize'.
+
+         Actual Workflow:
+         I am building a project where people can branch from current chats to have different threads of conversations so that the main branch is not subjected to context decay. But if i want to return to the main branch, the summary of the branch must also be included so as to make the main context less oblivious. So your job is to give me that summary.
+
+         Output Format:
+         The result should be just the summary as a string. If the conversation is not worth having a summary, just reply what you thought his/her intention was.
+
+         Final Instructions:
+         1. Stick strictly to the output format.
+         2. In the context provided, the AIMessage might have a persona. So it would be good if you could summarize based on that persona itself. I might have to deduct what the persona is yourself. If you are not able to, then it's fine just return a normal string.
+
+         Context is given below:
+      """
+   ),
+   MessagesPlaceholder(variable_name="context"),
+   (
+      "human",
+      """
+         Messages to summarize:
+
+         {messages_to_summarize}
+      """
+   ),
+])
+
 trimmer = trim_messages(
     max_tokens=10000,
     strategy="last",
@@ -38,14 +70,6 @@ trimmer = trim_messages(
     allow_partial=False,
     start_on="human",
 )
-
-class State(TypedDict):
-    messages : Annotated[Sequence[BaseMessage], add_messages]
-    branch: bool
-    stop_chat: bool
-    current_config: dict
-    parent: list
-    children: list
 
 def putMemory(config: dict, channel_values: dict, memory: MemorySaver) -> None:
    channel_value = channel_values
@@ -68,6 +92,14 @@ def putMemory(config: dict, channel_values: dict, memory: MemorySaver) -> None:
 
    new_versions = {"messages":current_ts}
    memory.put(config=config, checkpoint=checkpoint, metadata=metadata, new_versions=new_versions)
+
+class State(TypedDict):
+    messages : Annotated[Sequence[BaseMessage], add_messages]
+    branch: bool
+    stop_chat: bool
+    current_config: dict
+    parent: list
+    children: list
 
 class Graph:
 
@@ -112,12 +144,17 @@ class Graph:
       config_new_branch = {"configurable": {"thread_id": "abc125", "checkpoint_ns": "branch1"}}
 
       new_app = BranchGraph().buildGraph()
+
       branch_state = new_app.invoke({"messages": state["messages"], "current_config":config_new_branch}, config=config_new_branch)
-      #it should return a summary of whatever the messages where typed. Here whatever was added after the current point must be summerized and sent-back.
-      #Give the length of current context as context and the rest for summarization.
-      putMemory(config=config_new_branch, channel_values=branch_state, memory=memory)
       
-      return {"messages": branch_state["messages"][length_of_current_context:]} # this is for testing, will find out what to do here later.
+      putMemory(config=config_new_branch, channel_values=branch_state, memory=memory)
+
+      summary_chain = summarizer_prompt_template | model | StrOutputParser()
+      text_to_summarize = "\n".join(message.content for message in branch_state["messages"][length_of_current_context:])
+      summary = summary_chain.invoke({"context": state["messages"], "messages_to_summarize" : text_to_summarize})
+      summary = SystemMessage(content=summary)
+
+      return {"messages": [summary]}
 
    @staticmethod
    def query(state:State):
