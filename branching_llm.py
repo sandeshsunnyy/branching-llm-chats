@@ -98,8 +98,8 @@ class State(TypedDict):
     branch: bool
     stop_chat: bool
     current_config: dict
-    parent: list
-    children: list
+    parent: list # Really comes into play when we have branches within branches. Along with the parent the current state messages length has to be mentioned. So we don't waste storage. Each child's state is saved as it goes, but as the child branch merges back, only the messages from the child branch (no history) are saved. The length has to be saved along with the parent beacuse that becomes the point of history we provide the child with.
+    children: list #for retireval
 
 class Graph:
 
@@ -278,3 +278,13 @@ print("New Messages")
 print("-"*20)
 print(new_messages)
 print("\n")
+
+"""
+When you create a new thread:
+1. Generate the thread_id: thread_id = str(uuid.uuid4())
+2. Get other info: user_id = "user_12345" and created_at = datetime.utcnow()
+3. Store it: Save all three pieces of info in your database table (e.g., a "Conversations" table).
+4. Maybe store a one-liner as well for visualisations.
+"""
+
+#TODO: We'll set up a database to store all these conversations. That will be the next step. 
