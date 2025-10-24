@@ -1,7 +1,7 @@
 from langchain.chat_models import init_chat_model
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import START, END, MessagesState, StateGraph
+from langgraph.graph import START, END, StateGraph
 from typing import Sequence
 from langchain_core.messages import BaseMessage, SystemMessage, trim_messages, AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
@@ -9,7 +9,6 @@ from langgraph.graph.message import add_messages
 from typing_extensions import Annotated, TypedDict
 from datetime import datetime, timezone
 from langgraph.checkpoint.base import Checkpoint, CheckpointMetadata
-import langchain
 
 try: 
   from dotenv import load_dotenv
