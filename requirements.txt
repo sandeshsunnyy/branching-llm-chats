@@ -1,0 +1,4 @@
+"psycopg[binary]"
+langchain
+langgraph
+dotenv
