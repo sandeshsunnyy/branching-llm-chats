@@ -9,7 +9,6 @@ from langgraph.graph.message import add_messages
 from typing_extensions import Annotated, TypedDict
 from datetime import datetime, timezone
 from langgraph.checkpoint.base import Checkpoint, CheckpointMetadata
-
 try: 
   from dotenv import load_dotenv
 
