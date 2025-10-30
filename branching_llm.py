@@ -10,6 +10,7 @@ from typing_extensions import Annotated, TypedDict
 from datetime import datetime, timezone
 from langgraph.checkpoint.base import Checkpoint, CheckpointMetadata
 from utilities import prompt_template, summarizer_prompt_template
+import uuid
 try: 
   from dotenv import load_dotenv
 
@@ -101,7 +102,9 @@ class Graph:
 
       length_of_current_context = len(state["messages"])
 
-      config_new_branch = {"configurable": {"thread_id": "abc125", "checkpoint_ns": "branch1"}}
+      thread_id = uuid.uuid4()
+      checkpoint_ns = str(thread_id) + "_ns"
+      config_new_branch = {"configurable": {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}}
 
       new_app = BranchGraph().buildGraph()
 
@@ -215,29 +218,16 @@ class BranchGraph(Graph):
 
 app = Graph().buildGraph()
 
-config = {"configurable" : {"thread_id": "abc124"}}
+thread_id = uuid.uuid4()
+checkpoint_ns = str(thread_id) + "_ns"
+
+config = {"configurable" : {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}}
 
 from langchain_core.messages import HumanMessage, AIMessage
 
 app.invoke({"messages": [], "current_config": config}, config=config)
 
 
-config_new_branch = {"configurable": {"thread_id": "abc125", "checkpoint_ns": "branch1"}}
-
-memory_state = memory.get(config=config)
-new_memory_state = memory.get(config=config_new_branch)
-
-old_messages = memory_state["channel_values"]["messages"]
-new_messages = new_memory_state["channel_values"]["messages"]
-
-print("Old Messages")
-print("-"*20)
-print(old_messages)
-print("\n")
-print("New Messages")
-print("-"*20)
-print(new_messages)
-print("\n")
 
 """
 When you create a new thread:
