@@ -1,4 +1,4 @@
 "psycopg[binary]"
 langchain
 langgraph
-dotenv
+dotenvyoyo-migrations
