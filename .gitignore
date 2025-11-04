@@ -420,4 +420,4 @@ FodyWeavers.xsd
 /.vscode/
 #virtual Environments
 /venv/
-yoyo.ini
+alembic.ini

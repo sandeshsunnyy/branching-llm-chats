@@ -1,4 +1,5 @@
-"psycopg[binary]"
+psycopg[binary]
 langchain
 langgraph
-dotenvyoyo-migrations
+alembic
+sqlalchemy
