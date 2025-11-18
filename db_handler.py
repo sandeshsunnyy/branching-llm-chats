@@ -6,7 +6,7 @@ load_dotenv()
 
 CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS chat_branches (
-    branch_id UUID PRIMARY KEY,
+    branch_id UUID PRIMARY KEY NOT NULL,
     parent_id UUID REFERENCES chat_branches(branch_id),
     new_messages JSONB NOT NULL,
     parent_message_count_at_branch INTEGER,
@@ -23,9 +23,8 @@ ON chat_branches(parent_id);
 try:
     conn = psycopg.connect(
         host="localhost",
-        dbname="langgraph_chat",
-        user="sandesh",
-        password=os.environ.get("POSTGRES_PASSWORD")
+        dbname="langgraph_chats",
+        user="sandeshsunny",
     )
     
     print("Connection successful!")

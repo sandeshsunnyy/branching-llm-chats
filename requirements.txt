@@ -3,3 +3,4 @@ langchain
 langgraph
 alembic
 sqlalchemy
+python-dotenv
