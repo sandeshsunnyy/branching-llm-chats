@@ -19,5 +19,4 @@ class ChatBranches(Base):
     parent_message_count_at_branch = Column("parent_message_count_at_branch", Integer)
     summary = Column("summary", TEXT)
     created_at = Column("created_at", TIMESTAMP(timezone=True), server_default=func.now())
-    is_active = Column("is_active", BOOLEAN, default=True)
     

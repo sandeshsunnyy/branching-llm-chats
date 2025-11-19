@@ -122,7 +122,19 @@ class Graph:
    @staticmethod
    def query(state:State):
       user_input = input("Ask away: ")
+      index = len(state["messages"])
       query = [HumanMessage(content=user_input)]
+      branch_id = state["current_config"]["configurable"]["thread_id"]
+      #parent_id have to be defined properly in state
+      message = {
+         index : {
+            "human" : user_input
+         }
+      }
+      parent_count_at_branch = None
+      #summary need summary
+      #timestamp with postgres query only.
+
       return {"messages" : query}
 
    def stop(self, state: State):
