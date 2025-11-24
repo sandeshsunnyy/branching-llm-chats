@@ -10,7 +10,10 @@ from typing_extensions import Annotated, TypedDict
 from datetime import datetime, timezone
 from langgraph.checkpoint.base import Checkpoint, CheckpointMetadata
 from utilities import prompt_template, summarizer_prompt_template
+from db_handler import check_for_branch_entry
 import uuid
+import sys
+
 try: 
   from dotenv import load_dotenv
 
@@ -124,8 +127,12 @@ class Graph:
       user_input = input("Ask away: ")
       index = len(state["messages"])
       query = [HumanMessage(content=user_input)]
+
+      # Check if an entry for branch_id exists
       branch_id = state["current_config"]["configurable"]["thread_id"]
-      #parent_id have to be defined properly in state
+      entry_exists = check_for_branch_entry(branch_id=branch_id)
+
+      parent_id = state["parent"]["parent_id"]
       message = {
          index : {
             "human" : user_input
@@ -135,6 +142,15 @@ class Graph:
       #summary need summary
       #timestamp with postgres query only.
 
+      if entry_exists is None:
+         print('Database error.. exiting')
+         sys.exit(1)
+
+      if not entry_exists:
+         pass # Adding new entry if entry is not there
+      else:
+         pass # Updation logic
+      
       return {"messages" : query}
 
    def stop(self, state: State):
@@ -235,9 +251,11 @@ checkpoint_ns = str(thread_id) + "_ns"
 
 config = {"configurable" : {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}}
 
+parent_id = {"parent_id": thread_id, "current_msg_length": 0}
+
 from langchain_core.messages import HumanMessage, AIMessage
 
-app.invoke({"messages": [], "current_config": config}, config=config)
+app.invoke({"messages": [], "current_config": config, "parent": [parent_id]}, config=config)
 
 
 
