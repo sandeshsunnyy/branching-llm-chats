@@ -56,17 +56,10 @@ summarizer_prompt_template_oneliner = ChatPromptTemplate.from_messages([
          1. Stick strictly to the output format.
          2. In the context provided, the AIMessage might have a persona. So it would be good if you could summarize based on that persona itself. I might have to deduct what the persona is yourself. If you are not able to, then it's fine just return a normal string.
          3. KEEP THE ONE-LINER SHORT.
+         4. Try to be VERY creative you have all freedom
 
-         Context is given below:
+         The messages to summarize are given below:
       """
    ),
-   MessagesPlaceholder(variable_name="context"),
-   (
-      "human",
-      """
-         Messages to summarize:
-
-         {messages_to_summarize}
-      """
-   ),
+   MessagesPlaceholder(variable_name="messages")
 ])

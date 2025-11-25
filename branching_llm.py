@@ -9,8 +9,8 @@ from langgraph.graph.message import add_messages
 from typing_extensions import Annotated, TypedDict
 from datetime import datetime, timezone
 from langgraph.checkpoint.base import Checkpoint, CheckpointMetadata
-from utilities import prompt_template, summarizer_prompt_template
-from db_handler import check_for_branch_entry
+from utilities import prompt_template, summarizer_prompt_template, summarizer_prompt_template_oneliner
+from db_handler import check_for_branch_entry, insert_chat
 import uuid
 import sys
 
@@ -62,7 +62,7 @@ class State(TypedDict):
     branch: bool
     stop_chat: bool
     current_config: dict
-    parent: list # Really comes into play when we have branches within branches. Along with the parent the current state messages length has to be mentioned. So we don't waste storage. Each child's state is saved as it goes, but as the child branch merges back, only the messages from the child branch (no history) are saved. The length has to be saved along with the parent beacuse that becomes the point of history we provide the child with.
+    parent: uuid.UUID | None# Really comes into play when we have branches within branches. Along with the parent the current state messages length has to be mentioned. So we don't waste storage. Each child's state is saved as it goes, but as the child branch merges back, only the messages from the child branch (no history) are saved. The length has to be saved along with the parent beacuse that becomes the point of history we provide the child with.
     children: list #for retireval
 
 class Graph:
@@ -132,25 +132,32 @@ class Graph:
       branch_id = state["current_config"]["configurable"]["thread_id"]
       entry_exists = check_for_branch_entry(branch_id=branch_id)
 
-      print(f"{entry_exists=}")
-      sys.exit(0)
-
-      parent_id = state["parent"]["parent_id"]
-      message = {
-         index : {
-            "human" : user_input
-         }
-      }
-      parent_count_at_branch = None
-      #summary need summary
-      #timestamp with postgres query only.
 
       if entry_exists is None:
          print('Database error.. exiting')
          sys.exit(1)
 
       if not entry_exists:
-         pass # Adding new entry if entry is not there
+         parent_id = state["parent"]
+         message = {
+                     index : {
+                        "human" : user_input
+                     }
+                  }
+         parent_count_at_branch = None
+         # Creating summary
+         onliner_chain = summarizer_prompt_template_oneliner | model | StrOutputParser()
+         messages_to_summarize = state["messages"] + query
+         oneliner = onliner_chain.invoke({"messages": messages_to_summarize})
+
+         #timestamp with postgres query only.
+
+         insert_success = insert_chat(branch_id=branch_id, parent_id=parent_id, new_messages=message, parent_message_count_at_branch=None, summary=oneliner)
+         if insert_success:
+            print("Chat inserted into DB")
+         else:
+            print("Some error occured")
+      
       else:
          pass # Updation logic
       
@@ -254,11 +261,12 @@ checkpoint_ns = str(thread_id) + "_ns"
 
 config = {"configurable" : {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}}
 
-parent_id = {"parent_id": thread_id, "current_msg_length": 0}
+#initial branch has no parent and has not branched yet
+parent_id = None
 
 from langchain_core.messages import HumanMessage, AIMessage
 
-app.invoke({"messages": [], "current_config": config, "parent": [parent_id]}, config=config)
+app.invoke({"messages": [], "current_config": config, "parent": parent_id}, config=config)
 
 
 
