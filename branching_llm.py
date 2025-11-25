@@ -132,6 +132,9 @@ class Graph:
       branch_id = state["current_config"]["configurable"]["thread_id"]
       entry_exists = check_for_branch_entry(branch_id=branch_id)
 
+      print(f"{entry_exists=}")
+      sys.exit(0)
+
       parent_id = state["parent"]["parent_id"]
       message = {
          index : {

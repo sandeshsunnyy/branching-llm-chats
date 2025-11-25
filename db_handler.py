@@ -26,9 +26,11 @@ def connect_to_db() -> Connection | None:
 def check_for_branch_entry(branch_id) -> bool | None:
     try:
         conn = connect_to_db()
-        query = "SELECT EXISTS(SELECT 1 FROM chat_branches WHERE id = %s)"
-        conn.execute(query, (branch_id,))
-        exists = conn.fetchone()[0]
+        query = "SELECT EXISTS(SELECT 1 FROM chat_branches WHERE branch_id = %s)"
+        cursor = conn.cursor()
+        cursor.execute(query, (branch_id,))
+        
+        exists = cursor.fetchone()[0]
         return exists
     
     except psycopg.OperationalError as e:
