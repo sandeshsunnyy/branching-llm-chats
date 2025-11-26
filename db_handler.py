@@ -88,3 +88,44 @@ def insert_chat(branch_id: uuid.UUID, parent_id: uuid.UUID | None, new_messages:
         if conn:
             close_connection(conn=conn)
             print("Postgres connection closed successfully")
+
+def retrieve_messages(branch_id: uuid.UUID):
+    conn = connect_to_db()
+    query = "SELECT new_messages FROM chat_branches WHERE branch_id = %s"
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query, (branch_id,))
+        fetched_messages = cursor.fetchone()[0]
+        close_connection(conn=conn, cursor=cursor)
+        return fetched_messages
+    except psycopg.OperationalError as e:
+        print(f"Unable to fetch message:  {e}")
+        return False
+    except Exception as e:
+        print(f"An error occurred while fetching messages: {e}")
+        return False
+    finally:
+        if conn:
+            close_connection(conn=conn)
+            print("Postgres connection closed successfully")
+
+def updata_chat(branch_id: uuid.UUID, messages: dict) -> bool:
+    conn = connect_to_db()
+    query = "UPDATE chat_branches SET new_messages = %s WHERE branch_id = %s"
+    messages_json = json.dumps(messages, indent=2)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query, (messages_json, branch_id))
+        conn.commit()
+        close_connection(conn=conn, cursor=cursor)
+        return True
+    except psycopg.OperationalError as e:
+        print(f"Unable to update message:  {e}")
+        return False
+    except Exception as e:
+        print(f"An error occurred while updating messages: {e}")
+        return False
+    finally:
+        if conn:
+            close_connection(conn=conn)
+            print("Postgres connection closed successfully")

@@ -10,7 +10,7 @@ from typing_extensions import Annotated, TypedDict
 from datetime import datetime, timezone
 from langgraph.checkpoint.base import Checkpoint, CheckpointMetadata
 from utilities import prompt_template, summarizer_prompt_template, summarizer_prompt_template_oneliner
-from db_handler import check_for_branch_entry, insert_chat
+from db_handler import check_for_branch_entry, insert_chat, retrieve_messages, updata_chat
 import uuid
 import sys
 
@@ -159,8 +159,23 @@ class Graph:
             print("Some error occured")
       
       else:
-         pass # Updation logic
-      
+         fetched_messages = retrieve_messages(branch_id=branch_id)
+         print(f"{fetched_messages=}")
+         last_idx = list(fetched_messages.keys())[-1]
+         new_idx = int(last_idx) + 1
+         message = {
+            new_idx: {
+               "human": user_input
+            }
+         }
+         all_messages = {**fetched_messages, **message}
+         print(all_messages)
+         is_success = updata_chat(branch_id=branch_id, messages=all_messages)
+         if is_success:
+            print("Update successful")
+         else:
+            print("Update failed")
+
       return {"messages" : query}
 
    def stop(self, state: State):
