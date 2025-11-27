@@ -98,6 +98,8 @@ class Graph:
          print(chunk, end="", flush=True)
       print("\n\n")
       response = ''.join(chunks)
+      ai_msg = AIMessage(content=response)
+      print(ai_msg)
 
       branch_id = state["current_config"]["configurable"]["thread_id"]
       fetched_messages = retrieve_messages(branch_id=branch_id)
@@ -106,8 +108,12 @@ class Graph:
       new_idx = int(last_idx) + 1
       message = {
          new_idx: {
-            "ai": response
-         }
+                     "role" : "ai",
+                     "content" : ai_msg.content,
+                     "additional_kwargs" : ai_msg.additional_kwargs,
+                     "response_metadata" : ai_msg.response_metadata,
+                     "id" : datetime.now(timezone.utc).isoformat() + str(branch_id)
+                  }
       }
       all_messages = {**fetched_messages, **message}
       is_success = updata_chat(branch_id=branch_id, messages=all_messages)
@@ -115,7 +121,7 @@ class Graph:
          print("Updated AI message successful")
       else:
          print("Update failed for AI message")
-      return {"messages" : [AIMessage(content=response)]}
+      return {"messages" : [ai_msg]}
 
 
    def branch_chat(self, state:State):
@@ -141,9 +147,11 @@ class Graph:
 
    @staticmethod
    def query(state:State):
-      user_input = input("Ask away: ")
+      print("messages: ",state["messages"])
+      user_input = HumanMessage(content=input("Ask away: "))
+      print(user_input)
       index = len(state["messages"])
-      query = [HumanMessage(content=user_input)]
+      query = [user_input]
 
       # Check if an entry for branch_id exists
       branch_id = state["current_config"]["configurable"]["thread_id"]
@@ -158,7 +166,11 @@ class Graph:
          parent_id = state["parent"]
          message = {
                      index : {
-                        "human" : user_input
+                        "role" : "human",
+                        "content" : user_input.content,
+                        "additional_kwargs" : user_input.additional_kwargs,
+                        "response_metadata" : user_input.response_metadata,
+                        "id" : datetime.now(timezone.utc).isoformat() + str(branch_id) 
                      }
                   }
          parent_count_at_branch = None
@@ -168,7 +180,7 @@ class Graph:
          messages_to_summarize = state["messages"] + query
          oneliner = onliner_chain.invoke({"messages": messages_to_summarize})
 
-         #timestamp with postgres query only.
+         #timestamp is defaultly added
 
          insert_success = insert_chat(branch_id=branch_id, parent_id=parent_id, new_messages=message, parent_message_count_at_branch=parent_count_at_branch, summary=oneliner)
          if insert_success:
@@ -183,7 +195,13 @@ class Graph:
          new_idx = int(last_idx) + 1
          message = {
             new_idx: {
-               "human": user_input
+               {
+                  "role" : "human",
+                  "content" : user_input.content,
+                  "additional_kwargs" : user_input.additional_kwargs,
+                  "response_metadata" : user_input.response_metadata,
+                  "id" : datetime.now(timezone.utc).isoformat() + str(branch_id) 
+               }
             }
          }
          all_messages = {**fetched_messages, **message}
