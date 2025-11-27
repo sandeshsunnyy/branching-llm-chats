@@ -1,5 +1,4 @@
 from langchain.chat_models import init_chat_model
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, END, StateGraph
 from typing import Sequence
@@ -10,7 +9,7 @@ from typing_extensions import Annotated, TypedDict
 from datetime import datetime, timezone
 from langgraph.checkpoint.base import Checkpoint, CheckpointMetadata
 from utilities import prompt_template, summarizer_prompt_template, summarizer_prompt_template_oneliner
-from db_handler import check_for_branch_entry, insert_chat, retrieve_messages, updata_chat, initiate_branch_chat
+from db_handler import check_for_branch_entry, insert_chat, retrieve_messages, updata_chat, initiate_chat
 from helpers import build_children_list
 import uuid
 import sys
@@ -133,7 +132,7 @@ class Graph:
       branch_thread_id = uuid.uuid4()
       checkpoint_ns = str(branch_thread_id) + "_ns"
       config_new_branch = {"configurable": {"thread_id": branch_thread_id, "checkpoint_ns": checkpoint_ns}}
-      is_success = initiate_branch_chat(branch_id=branch_thread_id, parent_id=parent_id, parent_message_count_at_branch=length_of_current_context-1)
+      is_success = initiate_chat(branch_id=branch_thread_id, parent_id=parent_id, parent_message_count_at_branch=length_of_current_context-1)
       if is_success:
          print("New branch entry added")
       else:
@@ -345,8 +344,7 @@ config = {"configurable" : {"thread_id": thread_id, "checkpoint_ns": checkpoint_
 
 #initial branch has no parent and has not branched yet
 parent_id = None
-
-from langchain_core.messages import HumanMessage, AIMessage
+is_success = initiate_chat(branch_id=thread_id)
 
 app.invoke({"messages": [], "current_config": config, "parent": parent_id}, config=config)
 

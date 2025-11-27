@@ -66,8 +66,11 @@ def check_for_branch_entry(branch_id) -> bool | None:
             close_connection(conn=conn)
             print("postgres connection closed successfully.")
 
-        
+
 def insert_chat(branch_id: uuid.UUID, parent_id: uuid.UUID | None, new_messages: dict, parent_message_count_at_branch: int | None, summary: str) -> bool:
+    """
+    To be used if in some scenario, initiate_chat was not invoked.
+    """
     conn = connect_to_db()
     query = "INSERT INTO chat_branches (branch_id, parent_id, new_messages, parent_message_count_at_branch, summary) VALUES (%s, %s, %s, %s, %s)"
     new_messages_json = json.dumps(new_messages, indent=2)
@@ -89,7 +92,7 @@ def insert_chat(branch_id: uuid.UUID, parent_id: uuid.UUID | None, new_messages:
             close_connection(conn=conn)
             print("Postgres connection closed successfully")
 
-def initiate_branch_chat(branch_id: uuid.UUID, parent_id: uuid.UUID, parent_message_count_at_branch: int) -> bool:
+def initiate_chat(branch_id: uuid.UUID, parent_id: uuid.UUID = None, parent_message_count_at_branch: int = None) -> bool:
     conn = connect_to_db()
     query = "INSERT INTO chat_branches (branch_id, parent_id, parent_message_count_at_branch) VALUES (%s, %s, %s)"
     try: 
