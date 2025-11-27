@@ -98,6 +98,23 @@ class Graph:
          print(chunk, end="", flush=True)
       print("\n\n")
       response = ''.join(chunks)
+
+      branch_id = state["current_config"]["configurable"]["thread_id"]
+      fetched_messages = retrieve_messages(branch_id=branch_id)
+      print(f"{fetched_messages=}")
+      last_idx = list(fetched_messages.keys())[-1]
+      new_idx = int(last_idx) + 1
+      message = {
+         new_idx: {
+            "ai": response
+         }
+      }
+      all_messages = {**fetched_messages, **message}
+      is_success = updata_chat(branch_id=branch_id, messages=all_messages)
+      if is_success:
+         print("Updated AI message successful")
+      else:
+         print("Update failed for AI message")
       return {"messages" : [AIMessage(content=response)]}
 
 
@@ -145,6 +162,7 @@ class Graph:
                      }
                   }
          parent_count_at_branch = None
+
          # Creating summary
          onliner_chain = summarizer_prompt_template_oneliner | model | StrOutputParser()
          messages_to_summarize = state["messages"] + query
@@ -152,7 +170,7 @@ class Graph:
 
          #timestamp with postgres query only.
 
-         insert_success = insert_chat(branch_id=branch_id, parent_id=parent_id, new_messages=message, parent_message_count_at_branch=None, summary=oneliner)
+         insert_success = insert_chat(branch_id=branch_id, parent_id=parent_id, new_messages=message, parent_message_count_at_branch=parent_count_at_branch, summary=oneliner)
          if insert_success:
             print("Chat inserted into DB")
          else:
