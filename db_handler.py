@@ -89,6 +89,27 @@ def insert_chat(branch_id: uuid.UUID, parent_id: uuid.UUID | None, new_messages:
             close_connection(conn=conn)
             print("Postgres connection closed successfully")
 
+def initiate_branch_chat(branch_id: uuid.UUID, parent_id: uuid.UUID, parent_message_count_at_branch: int) -> bool:
+    conn = connect_to_db()
+    query = "INSERT INTO chat_branches (branch_id, parent_id, parent_message_count_at_branch) VALUES (%s, %s, %s)"
+    try: 
+        cursor = conn.cursor()
+        inputs = (branch_id, parent_id, parent_message_count_at_branch)
+        cursor.execute(query, inputs)
+        conn.commit()
+        close_connection(conn=conn, cursor=cursor)
+        return True
+    except psycopg.OperationalError as e:
+        print(f"Unable to query database. Error while inserting new branch entry: {e}")
+        return False
+    except Exception as e:
+        print(f"An error occurred while inserting new DB entry {e}")
+        return False
+    finally:
+        if conn:
+            close_connection(conn=conn)
+            print("Postgres connection closed successfully")
+
 def retrieve_messages(branch_id: uuid.UUID):
     conn = connect_to_db()
     query = "SELECT new_messages FROM chat_branches WHERE branch_id = %s"

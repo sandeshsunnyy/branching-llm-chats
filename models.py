@@ -15,7 +15,7 @@ class ChatBranches(Base):
 
     branch_id = Column("branch_id", UUID, primary_key=True)
     parent_id = Column("parent_id", UUID, ForeignKey("chat_branches.branch_id"))
-    new_messages = Column("new_messages", JSONB, nullable=False)
+    new_messages = Column("new_messages", JSONB)
     parent_message_count_at_branch = Column("parent_message_count_at_branch", Integer)
     summary = Column("summary", TEXT)
     created_at = Column("created_at", TIMESTAMP(timezone=True), server_default=func.now())
