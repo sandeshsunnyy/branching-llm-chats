@@ -22,7 +22,6 @@ try:
 except ImportError:
   pass
 
-
 model = init_chat_model("gemini-2.5-flash", model_provider="google_genai")
 memory = MemorySaver()
 
@@ -34,6 +33,9 @@ trimmer = trim_messages(
     allow_partial=False,
     start_on="human",
 )
+
+def save_message(branch_id: uuid.UUID, new_message: BaseMessage, role: str = 'user') -> bool | None:
+   pass
 
 def putMemory(config: dict, channel_values: dict, memory: MemorySaver) -> None:
    channel_value = channel_values
@@ -103,7 +105,6 @@ class Graph:
 
       branch_id = state["current_config"]["configurable"]["thread_id"]
       fetched_messages = retrieve_messages(branch_id=branch_id)
-      print(f"{fetched_messages=}")
       last_idx = list(fetched_messages.keys())[-1]
       new_idx = int(last_idx) + 1
       message = {
