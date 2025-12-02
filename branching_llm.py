@@ -101,28 +101,50 @@ class Graph:
       print("\n\n")
       response = ''.join(chunks)
       ai_msg = AIMessage(content=response)
-      print(ai_msg)
 
       branch_id = state["current_config"]["configurable"]["thread_id"]
-      fetched_messages = retrieve_messages(branch_id=branch_id)
-      last_idx = list(fetched_messages.keys())[-1]
-      new_idx = int(last_idx) + 1
-      message = {
-         new_idx: {
-                     "role" : "ai",
-                     "content" : ai_msg.content,
-                     "additional_kwargs" : ai_msg.additional_kwargs,
-                     "response_metadata" : ai_msg.response_metadata,
-                     "id" : datetime.now(timezone.utc).isoformat() + str(branch_id)
-                  }
-      }
-      all_messages = {**fetched_messages, **message}
-      is_success = updata_chat(branch_id=branch_id, messages=all_messages)
-      if is_success:
-         print("Updated AI message successful")
+      entry_exists = check_for_branch_entry(branch_id=branch_id)
+      if entry_exists is None:
+         print('Database error.. exiting')
+         sys.exit(1)
+      if entry_exists:
+         fetched_messages = retrieve_messages(branch_id=branch_id)
+         last_idx = list(fetched_messages.keys())[-1]
+         new_idx = int(last_idx) + 1
+         message = {
+            new_idx: {
+                        "role" : "ai",
+                        "content" : ai_msg.content,
+                        "additional_kwargs" : ai_msg.additional_kwargs,
+                        "response_metadata" : ai_msg.response_metadata,
+                        "id" : datetime.now(timezone.utc).isoformat() + str(branch_id)
+                     }
+         }
+         all_messages = {**fetched_messages, **message}
+         is_success = updata_chat(branch_id=branch_id, messages=all_messages)
+         if is_success:
+            print("Updated AI message successful")
+         else:
+            print("Update failed for AI message")
+         return {"messages" : [ai_msg]}
       else:
-         print("Update failed for AI message")
-      return {"messages" : [ai_msg]}
+         new_idx = 0
+         message = {
+            new_idx: {
+                        "role" : "ai",
+                        "content" : ai_msg.content,
+                        "additional_kwargs" : ai_msg.additional_kwargs,
+                        "response_metadata" : ai_msg.response_metadata,
+                        "id" : datetime.now(timezone.utc).isoformat() + str(branch_id)
+                     }
+         }
+         all_messages = message
+         is_success = updata_chat(branch_id=branch_id, messages=all_messages)
+         if is_success:
+            print("Updated AI message successful")
+         else:
+            print("Update failed for AI message")
+         return {"messages" : [ai_msg]}
 
 
    def branch_chat(self, state:State):
