@@ -50,7 +50,11 @@ def check_for_branch_entry(branch_id) -> bool | None:
         query = "SELECT EXISTS(SELECT 1 FROM chat_branches WHERE branch_id = %s)"
         cursor = conn.cursor()
         cursor.execute(query, (branch_id,))
-        exists = cursor.fetchone()[0]
+        try:
+            exists = cursor.fetchone()[0]
+        except TypeError as e:
+            print("Tried fetching but found none. Returning None.")
+            return None
         close_connection(conn=conn, cursor=cursor)
         return exists
     
@@ -119,7 +123,11 @@ def retrieve_messages(branch_id: uuid.UUID):
     try:
         cursor = conn.cursor()
         cursor.execute(query, (branch_id,))
-        fetched_messages = cursor.fetchone()[0]
+        try:
+            fetched_messages = cursor.fetchone()[0]
+        except TypeError as e:
+            print("Tried fetching but found none. Returning None")
+            return None
         close_connection(conn=conn, cursor=cursor)
         return fetched_messages
     except psycopg.OperationalError as e:
@@ -133,13 +141,18 @@ def retrieve_messages(branch_id: uuid.UUID):
             close_connection(conn=conn)
             print("Postgres connection closed successfully")
 
-def updata_chat(branch_id: uuid.UUID, messages: dict) -> bool:
+def updata_chat(branch_id: uuid.UUID, messages: dict, summary: str = None) -> bool:
     conn = connect_to_db()
-    query = "UPDATE chat_branches SET new_messages = %s WHERE branch_id = %s"
     messages_json = json.dumps(messages, indent=2)
+    if summary is None:
+        query = "UPDATE chat_branches SET new_messages = %s WHERE branch_id = %s"
+        inputs = (messages_json, branch_id)
+    else:
+        query = "UPDATE chat_branches SET new_messages = %s, summary = %s WHERE branch_id = %s"
+        inputs = (messages_json, summary, branch_id)
     try:
         cursor = conn.cursor()
-        cursor.execute(query, (messages_json, branch_id))
+        cursor.execute(query, inputs)
         conn.commit()
         close_connection(conn=conn, cursor=cursor)
         return True

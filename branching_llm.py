@@ -34,8 +34,25 @@ trimmer = trim_messages(
     start_on="human",
 )
 
-def save_message(branch_id: uuid.UUID, new_message: BaseMessage, role: str = 'user') -> bool | None:
-   pass
+def prepare_message(branch_id: uuid.UUID, new_message: BaseMessage, role: str = 'user') -> bool | None:
+      
+      if role in ["ai", "system", "human"]:
+         try:
+            template = {
+                           "role" : role,
+                           "content" : new_message.content,
+                           "additional_kwargs" : new_message.additional_kwargs,
+                           "response_metadata" : new_message.response_metadata,
+                           "id" : datetime.now(timezone.utc).isoformat() + str(branch_id)
+                        }
+            return template   
+         except Exception as e:
+            print("The following exception occured with creating the database object of new message."
+                  f"{e}")
+            return None
+      else:
+         print("Role is not defined currectly")
+         return None
 
 def putMemory(config: dict, channel_values: dict, memory: MemorySaver) -> None:
    channel_value = channel_values
@@ -92,8 +109,10 @@ class Graph:
    
    @staticmethod
    def call_model(state:State):
+      
       trimmed_messages = trimmer.invoke(state["messages"])
       chain = prompt_template | model | StrOutputParser()
+
       chunks = []
       for chunk in chain.stream({"messages": trimmed_messages, "language": "English"}):
          chunks.append(chunk)
@@ -103,22 +122,19 @@ class Graph:
       ai_msg = AIMessage(content=response)
 
       branch_id = state["current_config"]["configurable"]["thread_id"]
+
       entry_exists = check_for_branch_entry(branch_id=branch_id)
+
       if entry_exists is None:
          print('Database error.. exiting')
          sys.exit(1)
+
       if entry_exists:
          fetched_messages = retrieve_messages(branch_id=branch_id)
          last_idx = list(fetched_messages.keys())[-1]
          new_idx = int(last_idx) + 1
          message = {
-            new_idx: {
-                        "role" : "ai",
-                        "content" : ai_msg.content,
-                        "additional_kwargs" : ai_msg.additional_kwargs,
-                        "response_metadata" : ai_msg.response_metadata,
-                        "id" : datetime.now(timezone.utc).isoformat() + str(branch_id)
-                     }
+            new_idx: prepare_message(branch_id=branch_id, new_message=ai_msg, role="ai")
          }
          all_messages = {**fetched_messages, **message}
          is_success = updata_chat(branch_id=branch_id, messages=all_messages)
@@ -127,19 +143,13 @@ class Graph:
          else:
             print("Update failed for AI message")
          return {"messages" : [ai_msg]}
+      
       else:
          new_idx = 0
          message = {
-            new_idx: {
-                        "role" : "ai",
-                        "content" : ai_msg.content,
-                        "additional_kwargs" : ai_msg.additional_kwargs,
-                        "response_metadata" : ai_msg.response_metadata,
-                        "id" : datetime.now(timezone.utc).isoformat() + str(branch_id)
-                     }
+            new_idx: prepare_message(branch_id=branch_id, new_message=ai_msg, role="ai")
          }
-         all_messages = message
-         is_success = updata_chat(branch_id=branch_id, messages=all_messages)
+         is_success = updata_chat(branch_id=branch_id, messages=message)
          if is_success:
             print("Updated AI message successful")
          else:
@@ -185,7 +195,6 @@ class Graph:
    def query(state:State):
       print("messages: ",state["messages"])
       user_input = HumanMessage(content=input("Ask away: "))
-      print(user_input)
       index = len(state["messages"])
       query = [user_input]
 
@@ -201,13 +210,7 @@ class Graph:
       if not entry_exists:
          parent_id = state["parent"]
          message = {
-                     index : {
-                        "role" : "human",
-                        "content" : user_input.content,
-                        "additional_kwargs" : user_input.additional_kwargs,
-                        "response_metadata" : user_input.response_metadata,
-                        "id" : datetime.now(timezone.utc).isoformat() + str(branch_id) 
-                     }
+                     index : prepare_message(branch_id=branch_id, new_message=user_input, role="human")
                   }
          parent_count_at_branch = None
 
@@ -216,7 +219,7 @@ class Graph:
          messages_to_summarize = state["messages"] + query
          oneliner = onliner_chain.invoke({"messages": messages_to_summarize})
 
-         #timestamp is defaultly added
+         #timestamp is added by default
 
          insert_success = insert_chat(branch_id=branch_id, parent_id=parent_id, new_messages=message, parent_message_count_at_branch=parent_count_at_branch, summary=oneliner)
          if insert_success:
@@ -227,19 +230,10 @@ class Graph:
       else:
          fetched_messages = retrieve_messages(branch_id=branch_id)
          if fetched_messages:
-            print(f"{fetched_messages=}")
             last_idx = list(fetched_messages.keys())[-1]
             new_idx = int(last_idx) + 1
             message = {
-               new_idx: {
-                  {
-                     "role" : "human",
-                     "content" : user_input.content,
-                     "additional_kwargs" : user_input.additional_kwargs,
-                     "response_metadata" : user_input.response_metadata,
-                     "id" : datetime.now(timezone.utc).isoformat() + str(branch_id) 
-                  }
-               }
+               new_idx: prepare_message(branch_id=branch_id, new_message=user_input, role="human")
             }
             all_messages = {**fetched_messages, **message}
             print(all_messages)
@@ -251,15 +245,15 @@ class Graph:
          else:
             new_idx = 0
             message = {
-               new_idx : {
-                     "role" : "human",
-                     "content" : user_input.content,
-                     "additional_kwargs" : user_input.additional_kwargs,
-                     "response_metadata" : user_input.response_metadata,
-                     "id" : datetime.now(timezone.utc).isoformat() + str(branch_id) 
-                  }
+               new_idx : prepare_message(branch_id=branch_id, new_message=user_input, role="human")
             }
-            is_success = updata_chat(branch_id=branch_id, messages=message)
+
+            # Creating summary
+            onliner_chain = summarizer_prompt_template_oneliner | model | StrOutputParser()
+            messages_to_summarize = state["messages"] + query
+            oneliner = onliner_chain.invoke({"messages": messages_to_summarize})
+
+            is_success = updata_chat(branch_id=branch_id, messages=message, summary=oneliner)
             if is_success:
                print("Update successful")
             else:
@@ -357,19 +351,21 @@ class BranchGraph(Graph):
       )
       app = workflow.compile(memory)
       return app
+   
+if __name__ == "__main__":
 
-app = Graph().buildGraph()
+   app = Graph().buildGraph()
 
-thread_id = uuid.uuid4()
-checkpoint_ns = str(thread_id) + "_ns"
+   thread_id = uuid.uuid4()
+   checkpoint_ns = str(thread_id) + "_ns"
 
-config = {"configurable" : {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}}
+   config = {"configurable" : {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}}
 
-#initial branch has no parent and has not branched yet
-parent_id = None
-is_success = initiate_chat(branch_id=thread_id)
+   #initial branch has no parent and has not branched yet
+   parent_id = None
+   is_success = initiate_chat(branch_id=thread_id)
 
-app.invoke({"messages": [], "current_config": config, "parent": parent_id}, config=config)
+   app.invoke({"messages": [], "current_config": config, "parent": parent_id}, config=config)
 
 
 
