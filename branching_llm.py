@@ -159,13 +159,13 @@ class Graph:
 
    def branch_chat(self, state:State):
 
-      length_of_current_context = len(state["messages"])
+      length_of_current_context = len(state["messages"]) - 1 #for idx
 
       parent_id = state["current_config"]["configurable"]["thread_id"]
       branch_thread_id = uuid.uuid4()
       checkpoint_ns = str(branch_thread_id) + "_ns"
       config_new_branch = {"configurable": {"thread_id": branch_thread_id, "checkpoint_ns": checkpoint_ns}}
-      is_success = initiate_chat(branch_id=branch_thread_id, parent_id=parent_id, parent_message_count_at_branch=length_of_current_context-1)
+      is_success = initiate_chat(branch_id=branch_thread_id, parent_id=parent_id, parent_message_count_at_branch=length_of_current_context) # Remember this is idx
       if is_success:
          print("New branch entry added")
       else:
@@ -187,7 +187,7 @@ class Graph:
       1. Update with system message
       2. for child or branch add parent id and parent_message_count_at_branch
       """
-      children = build_children_list(children=state["children"], parent_id=parent_id, point_of_branching=length_of_current_context-1)
+      children = build_children_list(children=state["children"], parent_id=parent_id, point_of_branching=length_of_current_context)
 
       return {"messages": [summary], "children": children}
 
