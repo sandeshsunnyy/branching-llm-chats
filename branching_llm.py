@@ -194,7 +194,6 @@ class Graph:
 
    @staticmethod
    def query(state:State):
-      print("messages: ",state["messages"])
       user_input = HumanMessage(content=input("Ask away: "))
       index = len(state["messages"])
       query = [user_input]
