@@ -20,7 +20,8 @@ try:
   load_dotenv()
 
 except ImportError:
-  pass
+  print("Could not load dotenv. The environment variables are not accessible.")
+  sys.exit(1)
 
 model = init_chat_model("gemini-2.5-flash", model_provider="google_genai")
 memory = MemorySaver()
