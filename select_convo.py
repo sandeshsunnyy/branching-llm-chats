@@ -2,13 +2,13 @@
 from db_handler import retrieve_data_for_resuming_chat
 from langchain.messages import HumanMessage, AIMessage
 from branching_llm import Graph
+from helpers import print_conversations
 import uuid
 
-if __name__ == "__main__":
-    all_chats = retrieve_data_for_resuming_chat()
-    viable_chats = [chat for chat in all_chats if chat[2] is not None][0]
-    messages = list(viable_chats[1].values())
-    thread_id, checkpoint_ns = viable_chats[0], str(viable_chats[0]) + '_ns'
+def continue_chat(chat_data : tuple):
+   
+    messages = list(chat_data[1].values())
+    thread_id, checkpoint_ns = chat_data[0], str(chat_data[0]) + '_ns'
     config = {"configurable" : {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}}
 
     langchain_msgs = []
@@ -27,7 +27,25 @@ if __name__ == "__main__":
     
     app = Graph().buildGraph()
 
-    print(f"{langchain_msgs[-1].content}")
+    print("\n")
+    for msg in langchain_msgs:
+        if isinstance(msg, AIMessage):
+            print(f"Sir. llm : {msg.content}\n")
+        elif isinstance(msg, HumanMessage):
+            print(f"human : {msg.content}\n")
 
     app.invoke({"messages": langchain_msgs, "current_config": config, "parent": None}, config=config)
+
+if __name__ == "__main__":
+
+    all_chats = retrieve_data_for_resuming_chat()
+    viable_chats = [chat for chat in all_chats if chat[2] is not None]
+    summaries = [chat[2] for chat in all_chats if chat[2] is not None]
+
+    print_conversations(summaries)
+
+    choice = int(input("\nWhich conversation do you wish to continue? Enter the idx: ")) - 1
+
+    continue_chat(chat_data = viable_chats[choice])
+    
 
