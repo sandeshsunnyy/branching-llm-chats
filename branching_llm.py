@@ -132,13 +132,26 @@ class Graph:
 
       if entry_exists:
          fetched_messages = retrieve_messages(branch_id=branch_id)
+
+         summary = None
+
+         if len(fetched_messages) == 10:
+            onliner_chain = summarizer_prompt_template_oneliner | model | StrOutputParser()
+            messages_to_summarize = state["messages"] + [ai_msg]
+            summary = onliner_chain.invoke({"messages": messages_to_summarize})
+         
          last_idx = list(fetched_messages.keys())[-1]
          new_idx = int(last_idx) + 1
          message = {
             new_idx: prepare_message(branch_id=branch_id, new_message=ai_msg, role="ai")
          }
          all_messages = {**fetched_messages, **message}
-         is_success = updata_chat(branch_id=branch_id, messages=all_messages)
+
+         if summary is not None:
+            is_success = updata_chat(branch_id=branch_id, messages=all_messages, summary=summary)
+         else:
+            is_success = updata_chat(branch_id=branch_id, messages=all_messages)
+
          if is_success:
             print("Updated AI message successful")
          else:
@@ -230,14 +243,26 @@ class Graph:
       else:
          fetched_messages = retrieve_messages(branch_id=branch_id)
          if fetched_messages:
+
+            summary = None
+
+            if len(fetched_messages) == 10:
+               onliner_chain = summarizer_prompt_template_oneliner | model | StrOutputParser()
+               messages_to_summarize = state["messages"] + query
+               summary = onliner_chain.invoke({"messages": messages_to_summarize})
+            
             last_idx = list(fetched_messages.keys())[-1]
             new_idx = int(last_idx) + 1
             message = {
                new_idx: prepare_message(branch_id=branch_id, new_message=user_input, role="human")
             }
             all_messages = {**fetched_messages, **message}
-            print(all_messages)
-            is_success = updata_chat(branch_id=branch_id, messages=all_messages)
+            
+            if summary is not None:
+               is_success = updata_chat(branch_id=branch_id, messages=all_messages, summary=summary)   
+            else:
+               is_success = updata_chat(branch_id=branch_id, messages=all_messages)
+               
             if is_success:
                print("Update successful")
             else:
