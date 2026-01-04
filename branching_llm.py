@@ -189,7 +189,7 @@ class Graph:
       summary_chain = summarizer_prompt_template | model | StrOutputParser()
       text_to_summarize = "\n".join(message.content for message in branch_state["messages"][length_of_current_context:])
       summary = summary_chain.invoke({"context": state["messages"], "messages_to_summarize" : text_to_summarize})
-      summary = SystemMessage(content=summary)
+      summary_langchain = SystemMessage(content=summary)
 
       """
       1. Update with system message
@@ -200,10 +200,32 @@ class Graph:
       else:
          children = build_children_list(parent_id=parent_id, point_of_branching=length_of_current_context, children=state["children"])
 
-      prepare_message(branch_id=parent_id, new_message=summary, role='system') 
-      
+      summary_msg = prepare_message(branch_id=parent_id, new_message=summary_langchain, role='system') 
+      fetched_messages = retrieve_messages(branch_id=parent_id)
 
-      return {"messages": [summary], "children": children}
+      summary = None
+
+      if len(fetched_messages) == 10:
+         onliner_chain = summarizer_prompt_template_oneliner | model | StrOutputParser()
+         messages_to_summarize = state["messages"] + [summary_langchain]
+         summary = onliner_chain.invoke({"messages": messages_to_summarize})
+      
+      last_idx = list(fetched_messages.keys())[-1]
+      new_idx = int(last_idx) + 1
+      message = {
+         new_idx: summary_msg
+      }
+      all_messages = {**fetched_messages, **message}
+
+      if summary is not None:
+         is_success = updata_chat(branch_id=parent_id, messages=all_messages, summary=summary)
+      else:
+         is_success = updata_chat(branch_id=parent_id, messages=all_messages)
+
+      if not is_success:
+         print("Update failed for AI message")
+
+      return {"messages": [summary_langchain], "children": children}
 
    @staticmethod
    def query(state:State):
