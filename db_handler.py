@@ -109,17 +109,28 @@ def initiate_chat(branch_id: uuid.UUID, parent_id: uuid.UUID = None, parent_mess
         if conn:
             close_connection(conn=conn)
 
-def retrieve_messages(branch_id: uuid.UUID):
+def retrieve_messages(branch_id: uuid.UUID = None):
     conn = connect_to_db()
-    query = "SELECT new_messages FROM chat_branches WHERE branch_id = %s"
+    if branch_id is not None:
+        query = "SELECT new_messages FROM chat_branches WHERE branch_id = %s"
+    else: 
+        query = "SELECT new_messages FROM chat_branches ORDER BY created_at DESC"
     try:
         cursor = conn.cursor()
-        cursor.execute(query, (branch_id,))
-        try:
-            fetched_messages = cursor.fetchone()[0]
-        except TypeError as e:
-            print("Tried fetching but found none. Returning None")
-            return None
+        if branch_id is not None:
+            cursor.execute(query, (branch_id,))
+            try:
+                fetched_messages = cursor.fetchone()[0]
+            except TypeError as e:
+                print("Tried fetching but found none. Returning None")
+                return None
+        else:
+            cursor.execute(query=query)
+            try:
+                fetched_messages = cursor.fetchall()
+            except TypeError as e:
+                print("Tried fetching but found none. Returning None")
+                return None
         close_connection(conn=conn, cursor=cursor)
         return fetched_messages
     except psycopg.OperationalError as e:

@@ -5,3 +5,4 @@ alembic
 sqlalchemy
 python-dotenv
 langchain-google-genai
+langchain-openai

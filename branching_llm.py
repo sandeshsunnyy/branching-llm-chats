@@ -23,7 +23,7 @@ except ImportError:
   print("Could not load dotenv. The environment variables are not accessible.")
   sys.exit(1)
 
-model = init_chat_model("gemini-2.5-flash", model_provider="google_genai")
+model = init_chat_model("gpt-4o-mini",temperature=0.7)
 memory = MemorySaver()
 
 trimmer = trim_messages(
@@ -152,9 +152,7 @@ class Graph:
          else:
             is_success = updata_chat(branch_id=branch_id, messages=all_messages)
 
-         if is_success:
-            print("Updated AI message successful")
-         else:
+         if not is_success:
             print("Update failed for AI message")
          return {"messages" : [ai_msg]}
       
@@ -164,9 +162,7 @@ class Graph:
             new_idx: prepare_message(branch_id=branch_id, new_message=ai_msg, role="ai")
          }
          is_success = updata_chat(branch_id=branch_id, messages=message)
-         if is_success:
-            print("Updated AI message successful")
-         else:
+         if not is_success:
             print("Update failed for AI message")
          return {"messages" : [ai_msg]}
 
@@ -180,9 +176,7 @@ class Graph:
       checkpoint_ns = str(branch_thread_id) + "_ns"
       config_new_branch = {"configurable": {"thread_id": branch_thread_id, "checkpoint_ns": checkpoint_ns}}
       is_success = initiate_chat(branch_id=branch_thread_id, parent_id=parent_id, parent_message_count_at_branch=length_of_current_context) # Remember this is idx
-      if is_success:
-         print("New branch entry added")
-      else:
+      if not is_success:
          print("Failed to add branch entry..exiting..")
          sys.exit(1)
 
@@ -201,7 +195,13 @@ class Graph:
       1. Update with system message
       2. for child or branch add parent id and parent_message_count_at_branch
       """
-      children = build_children_list(children=state["children"], parent_id=parent_id, point_of_branching=length_of_current_context)
+      if state.get("children") is None:
+         children = build_children_list(parent_id=parent_id, point_of_branching=length_of_current_context)
+      else:
+         children = build_children_list(parent_id=parent_id, point_of_branching=length_of_current_context, children=state["children"])
+
+      prepare_message(branch_id=parent_id, new_message=summary, role='system') 
+      
 
       return {"messages": [summary], "children": children}
 
@@ -235,10 +235,8 @@ class Graph:
          #timestamp is added by default
 
          insert_success = insert_chat(branch_id=branch_id, parent_id=parent_id, new_messages=message, parent_message_count_at_branch=parent_count_at_branch, summary=oneliner)
-         if insert_success:
-            print("Chat inserted into DB")
-         else:
-            print("Some error occured")
+         if not insert_success:
+            print("Some error occured during inserting")
       
       else:
          fetched_messages = retrieve_messages(branch_id=branch_id)
@@ -263,9 +261,7 @@ class Graph:
             else:
                is_success = updata_chat(branch_id=branch_id, messages=all_messages)
                
-            if is_success:
-               print("Update successful")
-            else:
+            if not is_success:
                print("Update failed")
          else:
             new_idx = 0
@@ -279,9 +275,7 @@ class Graph:
             oneliner = onliner_chain.invoke({"messages": messages_to_summarize})
 
             is_success = updata_chat(branch_id=branch_id, messages=message, summary=oneliner)
-            if is_success:
-               print("Update successful")
-            else:
+            if not is_success:
                print("Update failed")
 
       return {"messages" : query}

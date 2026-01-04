@@ -1,6 +1,6 @@
 #TODO: We have to work on updating the one-liner
 from db_handler import retrieve_data_for_resuming_chat
-from langchain.messages import HumanMessage, AIMessage
+from langchain.messages import HumanMessage, AIMessage, SystemMessage
 from branching_llm import Graph
 from helpers import print_conversations
 import uuid
@@ -22,6 +22,9 @@ def continue_chat(chat_data : tuple):
             langchain_msgs.append(msg)
         elif message['role'] == 'human':
             msg = HumanMessage(content=content, id=msg_id, additional_kwargs=additional_kwargs, response_metadata=response_metadata)
+            langchain_msgs.append(msg)
+        elif message['role'] == 'system':
+            msg = SystemMessage(content=content, id=msg_id, additional_kwargs=additional_kwargs, response_metadata=response_metadata)
             langchain_msgs.append(msg)
     
     
