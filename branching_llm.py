@@ -14,6 +14,8 @@ from helpers import build_children_list
 import uuid
 import sys
 
+IDEAL_SUMMARY_WINDOW = 10
+
 try: 
   from dotenv import load_dotenv
 
@@ -85,8 +87,11 @@ class State(TypedDict):
     parent: uuid.UUID | None# Really comes into play when we have branches within branches. Along with the parent the current state messages length has to be mentioned. So we don't waste storage. Each child's state is saved as it goes, but as the child branch merges back, only the messages from the child branch (no history) are saved. The length has to be saved along with the parent beacuse that becomes the point of history we provide the child with.
     children: list[dict] #for retireval
 
-class Graph:
+class ChatGraph:
 
+   def __init__(self, branch_graph = False):
+      self.branch_graph = branch_graph
+      
    def ask_user_to_branch(self, state:State):
          if not state["messages"]:
             return {"branch": False}
@@ -135,7 +140,7 @@ class Graph:
 
          summary = None
 
-         if len(fetched_messages) == 10:
+         if len(fetched_messages) == IDEAL_SUMMARY_WINDOW:
             onliner_chain = summarizer_prompt_template_oneliner | model | StrOutputParser()
             messages_to_summarize = state["messages"] + [ai_msg]
             summary = onliner_chain.invoke({"messages": messages_to_summarize})
@@ -180,7 +185,7 @@ class Graph:
          print("Failed to add branch entry..exiting..")
          sys.exit(1)
 
-      new_app = BranchGraph().buildGraph()
+      new_app = ChatGraph(branch_graph=True).buildGraph()
 
       branch_state = new_app.invoke({"messages": state["messages"], "current_config":config_new_branch, "parent": parent_id}, config=config_new_branch)
       
@@ -205,7 +210,7 @@ class Graph:
 
       summary = None
 
-      if len(fetched_messages) == 10:
+      if len(fetched_messages) == IDEAL_SUMMARY_WINDOW:
          onliner_chain = summarizer_prompt_template_oneliner | model | StrOutputParser()
          messages_to_summarize = state["messages"] + [summary_langchain]
          summary = onliner_chain.invoke({"messages": messages_to_summarize})
@@ -266,7 +271,7 @@ class Graph:
 
             summary = None
 
-            if len(fetched_messages) == 10:
+            if len(fetched_messages) == IDEAL_SUMMARY_WINDOW:
                onliner_chain = summarizer_prompt_template_oneliner | model | StrOutputParser()
                messages_to_summarize = state["messages"] + query
                summary = onliner_chain.invoke({"messages": messages_to_summarize})
@@ -303,7 +308,12 @@ class Graph:
       return {"messages" : query}
 
    def stop(self, state: State):
-      decision = input("Do you want to end the conversation? (y/n): ").strip().lower()
+      if self.branch_graph:
+         query_msg = "Do you want to return to main branch? (y/n): "
+      else:
+         query_msg = "Do you want to end the conversation? (y/n): "
+
+      decision = input(query_msg).strip().lower()
       if decision == 'y':
          return {"stop_chat": True }
       elif decision == 'n':
@@ -349,53 +359,10 @@ class Graph:
       )
       app = workflow.compile(memory)
       return app
-
-class BranchGraph(Graph):
-
-   def stop(self, state):
-      decision = input("Do you want to return to main branch? (y/n): ").strip().lower()
-      if decision == 'y':
-         return {"stop_chat": True }
-      elif decision == 'n':
-         return {"stop_chat": False}
-      else:
-         print("Invalid entry!")
-         decision = self.stop(state)
-         return decision
-      
-   def buildGraph(self):
-      workflow = StateGraph(state_schema=State)
-      workflow.add_node("ask_to_branch", self.ask_user_to_branch)
-      workflow.add_edge(START, "ask_to_branch")
-      workflow.add_node("model", self.call_model)
-      workflow.add_node("branch_chat", self.branch_chat)
-      workflow.add_node("query", self.query)
-      workflow.add_edge("query", "model")
-      workflow.add_node("stop", self.stop)
-      workflow.add_edge("model", "stop")
-      workflow.add_edge("branch_chat", "stop")
-      workflow.add_conditional_edges(
-         source="ask_to_branch",
-         path=self.brancher,
-         path_map={
-            "branch": "branch_chat",
-            "no branch": "query"
-         }
-      )
-      workflow.add_conditional_edges(
-         source="stop",
-         path=self.should_stop,
-         path_map={
-            "stop": END,
-            "continue": "ask_to_branch"
-         }
-      )
-      app = workflow.compile(memory)
-      return app
    
 if __name__ == "__main__":
 
-   app = Graph().buildGraph()
+   app = ChatGraph().buildGraph()
 
    thread_id = uuid.uuid4()
    checkpoint_ns = str(thread_id) + "_ns"
